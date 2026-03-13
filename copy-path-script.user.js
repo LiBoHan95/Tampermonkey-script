@@ -20,7 +20,7 @@
     // 默认配置
     const defaultConfig = {
         // 目标域名列表，链接的 host 包含这些域名时会显示复制按钮
-        targetDomains: ['fuulea.com'],
+        targetDomains: [],
         // 是否在匹配站点上显示按钮（true 表示在当前访问的网站上生效）
         enabled: true
     };
@@ -43,7 +43,7 @@
 
         const newDomains = prompt(
             '配置复制路径脚本\n\n请输入要匹配的目标域名（每行一个）：\n（链接的 host 包含这些域名或为 IP 地址时会显示复制按钮）',
-            domainsStr
+            domainsStr || '示例：192.168.1.1\n示例：example.com'
         );
 
         if (newDomains !== null) {

@@ -24,7 +24,20 @@
     // 获取配置
     function getConfig() {
         const saved = GM_getValue(CONFIG_KEY);
-        return saved ? { ...defaultConfig, ...saved } : defaultConfig;
+        if (!saved) return defaultConfig;
+
+        // 兼容旧配置格式（如果是字符串则转换为数组）
+        const config = {};
+        for (const [key, value] of Object.entries(saved)) {
+            if (typeof value === 'string') {
+                config[key] = [value];
+            } else if (Array.isArray(value)) {
+                config[key] = value;
+            } else {
+                config[key] = [];
+            }
+        }
+        return config;
     }
 
     // 保存配置
@@ -36,7 +49,7 @@
     function openConfig() {
         const config = getConfig();
         const currentHost = window.location.hostname;
-        const currentDomains = config[currentHost] || [];
+        const currentDomains = Array.isArray(config[currentHost]) ? config[currentHost] : [];
         const domainsStr = currentDomains.join('\n');
 
         const newDomains = prompt(
@@ -59,7 +72,8 @@
         const config = getConfig();
         let configStr = '';
         for (const [site, domains] of Object.entries(config)) {
-            configStr += `# ${site}\n${domains.join('\n')}\n\n`;
+            const domainArray = Array.isArray(domains) ? domains : [domains];
+            configStr += `# ${site}\n${domainArray.join('\n')}\n\n`;
         }
 
         const newConfigStr = prompt(
@@ -195,7 +209,7 @@
     function init() {
         const config = getConfig();
         const currentHost = window.location.hostname;
-        const targetDomains = config[currentHost] || [];
+        const targetDomains = Array.isArray(config[currentHost]) ? config[currentHost] : [];
 
         // 如果当前站点没有配置且没有 IP 链接需求，可以跳过
         if (targetDomains.length === 0) {

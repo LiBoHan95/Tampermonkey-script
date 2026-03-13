@@ -3,7 +3,7 @@
 // @namespace    http://tampermonkey.net/
 // @version      1.1
 // @description  为特定 IP 或自定义域名的链接添加复制路径按钮
-// @match        *://*/*
+// @match        *://*.chandao.com/*
 // @grant        GM_setClipboard
 // @grant        GM_registerMenuCommand
 // @grant        GM_getValue

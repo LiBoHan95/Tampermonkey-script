@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         复制链接路径
 // @namespace    http://tampermonkey.net/
-// @version      1.1
+// @version      2.0
 // @description  为特定 IP 或自定义域名的链接添加复制路径按钮
-// @match        *://*.chandao.com/*
+// @match        *://*/*
 // @grant        GM_setClipboard
 // @grant        GM_registerMenuCommand
 // @grant        GM_getValue
@@ -17,13 +17,9 @@
     // 配置存储键名
     const CONFIG_KEY = 'copyPathConfig';
 
-    // 默认配置
-    const defaultConfig = {
-        // 目标域名列表，链接的 host 包含这些域名时会显示复制按钮
-        targetDomains: [],
-        // 是否在匹配站点上显示按钮（true 表示在当前访问的网站上生效）
-        enabled: true
-    };
+    // 默认配置：每个网站可以配置多个目标域名
+    // 格式：{ 'chandao.com': ['fuulea.com', '192.168.1.1'], 'example.com': [] }
+    const defaultConfig = {};
 
     // 获取配置
     function getConfig() {
@@ -39,23 +35,66 @@
     // 打开配置面板
     function openConfig() {
         const config = getConfig();
-        const domainsStr = config.targetDomains.join('\n');
+        const currentHost = window.location.hostname;
+        const currentDomains = config[currentHost] || [];
+        const domainsStr = currentDomains.join('\n');
 
         const newDomains = prompt(
-            '配置复制路径脚本\n\n请输入要匹配的目标域名（每行一个）：\n（链接的 host 包含这些域名或为 IP 地址时会显示复制按钮）',
-            domainsStr || '示例：192.168.1.1\n示例：example.com'
+            `配置复制路径脚本 - 当前站点：${currentHost}\n\n` +
+            '请输入要匹配的目标域名（每行一个）：\n' +
+            '（链接的 host 包含这些域名或为 IP 地址时会显示复制按钮）',
+            domainsStr || '示例：192.168.1.1\n示例：example.com\n示例：internal.local'
         );
 
         if (newDomains !== null) {
             const domainList = newDomains.split('\n').map(s => s.trim()).filter(s => s);
-            config.targetDomains = domainList.length > 0 ? domainList : [];
+            config[currentHost] = domainList.length > 0 ? domainList : [];
             saveConfig(config);
-            alert('配置已保存！\n当前配置：' + (config.targetDomains.join(', ') || '无'));
+            alert('配置已保存！\n当前站点：' + currentHost + '\n匹配目标：' + (config[currentHost].join(', ') || '无'));
+        }
+    }
+
+    // 打开全局配置面板（查看所有站点配置）
+    function openGlobalConfig() {
+        const config = getConfig();
+        let configStr = '';
+        for (const [site, domains] of Object.entries(config)) {
+            configStr += `# ${site}\n${domains.join('\n')}\n\n`;
+        }
+
+        const newConfigStr = prompt(
+            '全局配置 - 复制路径脚本\n\n' +
+            '格式：每段配置以 # 开头是网站域名，下面是该站点的目标域名（每行一个）\n\n' +
+            configStr || '# 示例：chandao.com\nfuulea.com\n192.168.7.233\n\n# 示例：example.com\ninternal.api',
+            '配置说明：\n# 开头的行表示网站域名\n下面的行是该网站要匹配的目标域名/IP\n\n'
+        );
+
+        if (newConfigStr !== null) {
+            const newConfig = {};
+            let currentSite = null;
+
+            newConfigStr.split('\n').forEach(line => {
+                const trimmed = line.trim();
+                if (!trimmed) return;
+
+                if (trimmed.startsWith('#')) {
+                    currentSite = trimmed.substring(1).trim();
+                    if (!newConfig[currentSite]) {
+                        newConfig[currentSite] = [];
+                    }
+                } else if (currentSite) {
+                    newConfig[currentSite].push(trimmed);
+                }
+            });
+
+            saveConfig(newConfig);
+            alert('全局配置已保存！\n共配置了 ' + Object.keys(newConfig).length + ' 个站点');
         }
     }
 
     // 注册菜单命令
-    GM_registerMenuCommand('⚙️ 配置复制路径脚本', openConfig);
+    GM_registerMenuCommand('⚙️ 配置当前站点匹配规则', openConfig);
+    GM_registerMenuCommand('📋 全局配置管理', openGlobalConfig);
 
     // 判断是否为 IP 地址
     function isIPAddress(host) {
@@ -155,13 +194,19 @@
     // 主函数
     function init() {
         const config = getConfig();
-        if (!config.enabled) return;
+        const currentHost = window.location.hostname;
+        const targetDomains = config[currentHost] || [];
 
-        processLinks(config.targetDomains);
+        // 如果当前站点没有配置且没有 IP 链接需求，可以跳过
+        if (targetDomains.length === 0) {
+            // 仍然运行，因为 IP 地址总是会匹配
+        }
+
+        processLinks(targetDomains);
 
         // 监听 DOM 变化（应对动态加载的内容）
         const observer = new MutationObserver(() => {
-            processLinks(config.targetDomains);
+            processLinks(targetDomains);
         });
         observer.observe(document.body, {
             childList: true,
